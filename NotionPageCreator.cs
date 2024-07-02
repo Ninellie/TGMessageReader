@@ -1,22 +1,21 @@
-﻿using Notion.Client;
-using TL;
+﻿using Microsoft.Extensions.Configuration;
+using Notion.Client;
 
 namespace MessageReader;
 
 public class NotionPageCreator
 {
-    public string DatabaseID { get; set; }
-        
     private readonly NotionClient _client;
+    private readonly IConfiguration _configuration;
 
-    public NotionPageCreator(string databaseId)
+    public NotionPageCreator(IConfiguration config)
     {
-        DatabaseID = databaseId;
+        _configuration = config;
         _client = NotionClientFactory.Create(new ClientOptions
         {
-            AuthToken = Environment.GetEnvironmentVariable("NotionOptions__AuthToken"),
-            BaseUrl = "https://api.notion.com/v1/pages/",
-            NotionVersion = "2022-06-28"
+            AuthToken = _configuration["AuthToken"],
+            BaseUrl = _configuration["BaseUrl"],
+            NotionVersion = _configuration["2022-06-28"]
         });
     }
     
@@ -24,67 +23,92 @@ public class NotionPageCreator
     {
         var databaseParentInput = new DatabaseParentInput
         {
-            DatabaseId = DatabaseID
+            DatabaseId = _configuration["DatabaseId"]
         };
         var builder = PagesCreateParametersBuilder.Create(databaseParentInput);
-        var createdPage = await _client.Pages.CreateAsync(builder.Build());
-
-        var updatedProperties = createdPage.Properties;
-        var date = updatedProperties["Date"] as DatePropertyValue;
-        var group = updatedProperties["Group"] as SelectPropertyValue;
-        var tags = updatedProperties["Tags"] as MultiSelectPropertyValue;
-        var url = updatedProperties["URL"] as UrlPropertyValue;
-        if (group != null) group.Select = new SelectOption() { Name = data.ChatTitle };
-        if (date != null)
+        builder.AddPageContent(GetPageContent(data.Content));
+        builder.AddProperty("Date", GetDateProperty(data.Date));
+        builder.AddProperty("Group", GetSelectPropertyValue(data.ChatTitle));
+        builder.AddProperty("URL", GetUrlPropertyValue($"https://t.me/{data.ChatTitle}/{data.Id}"));
+        builder.AddProperty("Tags", GetMultiSelectPropertyValue(data.ExtractHashtags()));
+        if (!string.IsNullOrEmpty(data.PostAuthor))
         {
-            var d = new Date
-            {
-                Start = data.Date
-            };
-            date.Date = d;
+            builder.AddProperty("SenderUrl", GetUrlPropertyValue($"https://t.me/{data.PostAuthor}"));
         }
-        if (tags != null)
-        {
-            foreach (var hashTag in data.ExtractHashtags())
-            {
-                var selectOption = new SelectOption
-                {
-                    Name = hashTag
-                };
-                tags.MultiSelect.Add(selectOption);
-            }
-        }
-
-        if (url != null)
-        {
-            url.Url = $"https://t.me/{data.ChatTitle}/{data.Id}";
-        }
-            
-        await _client.Pages.UpdatePropertiesAsync(createdPage.Id, updatedProperties);
+        var page = builder.Build();
+        await _client.Pages.CreateAsync(page);
     }
 
-    private static RichTextBase GetRichTextBase(string text)
+    private ParagraphBlock GetPageContent(string content)
     {
-        return new RichTextBase
-        {
-            PlainText = text,
-            Annotations = new Annotations(),
-            Href = "",
-            Type = RichTextType.Text
-        };
-    }
-        
-    private static ParagraphBlock GetParagraphBlock(string text)
-    {
-        var block = new ParagraphBlock()
+
+        var paragraphBlock = new ParagraphBlock()
         {
             Paragraph = new ParagraphBlock.Info
             {
-                RichText = new[]{ GetRichTextBase(text) }
+                RichText = new List<RichTextBase>
+                {
+                    new RichTextText
+                    {
+                        Text = new Text
+                        {
+                            Content = content
+                        }
+                    }
+                }
             }
         };
+        return paragraphBlock;
+    }
 
-        return block;
+    private DatePropertyValue GetDateProperty(DateTime date)
+    {
+        var dateProperty = new DatePropertyValue
+        {
+            Date = new Date
+            {
+                Start = date.Date
+            }
+        };
+        return dateProperty;
+    }
+
+    private SelectPropertyValue GetSelectPropertyValue(string tag)
+    {
+        var selectProperty = new SelectPropertyValue
+        {
+            Select = new SelectOption
+            {
+                Name = tag
+            }
+        };
+        return selectProperty;
+    }
+    
+    private MultiSelectPropertyValue GetMultiSelectPropertyValue(IEnumerable<string> tags)
+    {
+        var multiSelectProperty = new MultiSelectPropertyValue
+        {
+            MultiSelect = new List<SelectOption>()
+        };
+        foreach (var tag in tags)
+        {
+            multiSelectProperty.MultiSelect.Add(new SelectOption
+            {
+                Name = tag
+            });
+        }
+
+        return multiSelectProperty;
+    }
+
+    private UrlPropertyValue GetUrlPropertyValue(string url)
+    {
+        var urlProperty = new UrlPropertyValue
+        {
+            Url = url
+        };
+        return urlProperty;
     }
 
     private static object? GetPropValue(PropertyValue p)

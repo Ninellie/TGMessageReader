@@ -1,4 +1,5 @@
-﻿using TL;
+﻿using Microsoft.Extensions.Configuration;
+using TL;
 using WTelegram;
 
 namespace MessageReader;
@@ -6,16 +7,18 @@ namespace MessageReader;
 public class TelegramGroupScanner
 {
     private readonly Client _client;
+    private readonly IConfiguration _configuration;
 
-    public TelegramGroupScanner()
+    public TelegramGroupScanner(IConfiguration config)
     {
+        _configuration = config;
         _client = new Client(Config);
     }
 
     public async Task Login()
     {
         var myself = await _client.LoginUserIfNeeded();
-        Console.WriteLine($"We are logged-in as {myself} (id {myself.id})");
+        Console.WriteLine($"Logged-in as {myself} (id {myself.id})");
     }
 
     public async Task<IEnumerable<MessageData>> GetMessagesFromGroup(string groupMainUsername, DateTime olderThan, DateTime newerThan)
@@ -76,7 +79,8 @@ public class TelegramGroupScanner
         
         foreach (var msg in validMessages)
         {
-            var data = new MessageData(msg.message, msg.ID, msg.Date, msg.From.ID.ToString(), groupMainUsername); 
+            var userName = await GetUser(msg, group.ToInputPeer());
+            var data = new MessageData(msg.message, msg.ID, msg.Date, userName, groupMainUsername); 
             messageDataList.Add(data);
         }
         
@@ -104,17 +108,29 @@ public class TelegramGroupScanner
         }
     }
 
-    private static string? Config(string what)
+    private async Task<string> GetUser(Message message, InputPeer chatId)
+    {
+        var inputUserFromMessage = new InputUserFromMessage
+        {
+            msg_id = message.id,
+            peer = chatId,
+            user_id = message.from_id.ID
+        };
+        var userInfo = await _client.Users_GetFullUser(inputUserFromMessage);
+        return userInfo.users.FirstOrDefault().Value.MainUsername;
+    }
+    
+    private string? Config(string what)
     {
         switch (what)
         {
-            case "api_id": return "24307614";
-            case "api_hash": return "59f352bb8429550d94687a56e6ab7af5";
-            case "phone_number": return "+382 68132535";
+            case "api_id": return _configuration["api_id"];
+            case "api_hash": return _configuration["api_hash"];
+            case "phone_number": return _configuration["phone_number"];
             case "verification_code": Console.Write("Code: "); return Console.ReadLine();
-            case "first_name": return "Alexander";      // if sign-up is required
-            case "last_name": return "Pavlov";        // if sign-up is required
-            case "password": return "secret!";     // if user has enabled 2FA
+            case "first_name": return _configuration["first_name"];      // if sign-up is required
+            case "last_name": return _configuration["last_name"];        // if sign-up is required
+            case "password": return _configuration["password"];     // if user has enabled 2FA
             default: return null;                  // let WTelegramClient decide the default config
         }
     }
