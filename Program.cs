@@ -1,102 +1,55 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using WTelegram;
 
 namespace MessageReader;
 
 public class Program
 {
-    private static TelegramGroupScanner _tgService;
+    private static TelegramGroupScannerClient _tgClient;
     private static NotionPageCreator _notionService;
-    private static IConfiguration _scanConfiguration;
-
+    private static TelegramGroupScannerBot _tgBotService;
+    private static IConfiguration _configuration;
     public static async Task Main(string[] args)
     {
+        var builder = WebApplication.CreateBuilder(args);
+        var connection = new Microsoft.Data.Sqlite.SqliteConnection(@"Data Source=WTelegramBot.sqlite");
+        var bot = new Bot(Config("bot_token")!, int.Parse(Config("api_id")!), Config("api_hash")!, connection);
+        builder.Services.AddSingleton(bot);
+        builder.Services.AddHostedService<TelegramGroupScannerBot>();
+        builder.Services.AddHostedService<ScanTaskHandler>();
+        var app = builder.Build();
+        await app.RunAsync();
+        
+
         Console.WriteLine("Configuration");
         var configuration = new ConfigurationBuilder().AddJsonFile($"appsettings.json");
         var config = configuration.Build();
-        _scanConfiguration = config.GetRequiredSection("ScanConfig").GetRequiredSection("Groups");
-        Console.WriteLine("Creating Telegram Service");
-        _tgService = new TelegramGroupScanner(config.GetRequiredSection("TelegramConfig"));
-        Console.WriteLine("Logging in telegram client");
-        await _tgService.Login();
 
-        Console.WriteLine("Creating Notion Service");
+        // Получение конфигурации для телеграма
+        _configuration = config.GetRequiredSection("TelegramConfig");
+        var whiteList = config.GetRequiredSection("AllowedHosts").Value?.Split(",")!;
+
+        _tgClient = new TelegramGroupScannerClient(_configuration);
+        await _tgClient.Login();
+
         _notionService = new NotionPageCreator(config.GetRequiredSection("NotionConfig"));
-
-        Console.WriteLine("Scanning");
-        await HandleScan();
     }
 
-    private static async Task HandleScan()
+    private static string? Config(string what)
     {
-        while (true)
+        switch (what)
         {
-            var groupName = GetGroupName();
-
-            var depth = GetScanDepth();
-
-            var messages = await _tgService.GetMessagesFromGroup(groupName, DateTime.Now, DateTime.Now.AddHours(depth));
-
-            if (messages != null && !messages.Any())
-            {
-                Console.WriteLine("Zero messages found");
-                return;
-            }
-
-            foreach (var message in messages)
-            {
-                await _notionService.CreateMessagePage(message);
-            }
+            case "api_id": return _configuration["api_id"];
+            case "bot_token": return _configuration["bot_token"];
+            case "api_hash": return _configuration["api_hash"];
+            case "phone_number": return _configuration["phone_number"];
+            case "verification_code": Console.Write("Code: "); return Console.ReadLine();
+            case "first_name": return _configuration["first_name"];      // if sign-up is required
+            case "last_name": return _configuration["last_name"];        // if sign-up is required
+            case "password": return _configuration["password"];     // if user has enabled 2FA
+            default: return null;                  // let WTelegramClient decide the default config
         }
-    }
-
-    private static int GetScanDepth()
-    {
-        Console.WriteLine("Enter scanning depth");
-        int depth = 0;
-        while (depth == 0)
-        {
-            var line = Console.ReadLine();
-            depth = Convert.ToInt32(line) * -1;
-            if (depth == 0)
-            {
-                Console.WriteLine("Scanning depth can not be 0. No messages will be scanned");
-            }
-        }
-        return depth;
-    }
-
-    private static string GetGroupName()
-    {
-        var groupName = "";
-        var counter = 0;
-        for (int i = 0; i < 100; i++)
-        {
-            var s = _scanConfiguration[i.ToString()];
-            if (string.IsNullOrEmpty(s))
-            {
-                break;
-            }
-            counter++;
-            Console.WriteLine($"{i} - {s}");
-        }
-
-        Console.WriteLine($"Enter group number");
-
-        if (counter != 0)
-        {
-            var line = Console.ReadLine();
-            if (line != null) groupName = _scanConfiguration[line];
-        }
-
-        while (string.IsNullOrEmpty(groupName) || string.IsNullOrWhiteSpace(groupName))
-        {
-            Console.WriteLine("Enter telegram group name for scan");
-            groupName = Console.ReadLine();
-            if (string.IsNullOrEmpty(groupName))
-            {
-                Console.WriteLine("Can not scan empty group");
-            }
-        }
-        return groupName;
     }
 }

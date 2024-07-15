@@ -4,12 +4,12 @@ using WTelegram;
 
 namespace MessageReader;
 
-public class TelegramGroupScanner
+public class TelegramGroupScannerClient
 {
     private readonly Client _client;
     private readonly IConfiguration _configuration;
 
-    public TelegramGroupScanner(IConfiguration config)
+    public TelegramGroupScannerClient(IConfiguration config)
     {
         _configuration = config;
         _client = new Client(Config);
@@ -88,25 +88,25 @@ public class TelegramGroupScanner
         return messageDataList;
     }
 
-    private void HandleMessagesChatsLogs(Messages_Chats chats)
-    {
-        Console.WriteLine($"Number of chats found: {chats.chats.Count}");
-        var channelsCount = chats.chats.Count(x => x.Value.IsChannel);
-        var groupsCount = chats.chats.Count(x => x.Value.IsGroup);
-        var activeChatsCount = chats.chats.Count(x => x.Value.IsActive);
-        Console.WriteLine($"Number of channels: {channelsCount}");
-        Console.WriteLine($"Number of groups: {groupsCount}");
-        Console.WriteLine($"Number of active chats: {activeChatsCount}");
-        foreach (var (key, chatBase) in chats.chats)
-        {
-            Console.WriteLine($"Chat Title: {chatBase.Title}," +
-                              $"Chat ID: {chatBase.ID}, " +
-                              $"Chat Main Username: {chatBase.MainUsername}, " +
-                              $"IsGroup: {chatBase.IsGroup}, " +
-                              $"IsChannel: {chatBase.IsChannel}, " +
-                              $"IsActive: {chatBase.IsActive}");
-        }
-    }
+    //private void HandleMessagesChatsLogs(Messages_Chats chats)
+    //{
+    //    Console.WriteLine($"Number of chats found: {chats.chats.Count}");
+    //    var channelsCount = chats.chats.Count(x => x.Value.IsChannel);
+    //    var groupsCount = chats.chats.Count(x => x.Value.IsGroup);
+    //    var activeChatsCount = chats.chats.Count(x => x.Value.IsActive);
+    //    Console.WriteLine($"Number of channels: {channelsCount}");
+    //    Console.WriteLine($"Number of groups: {groupsCount}");
+    //    Console.WriteLine($"Number of active chats: {activeChatsCount}");
+    //    foreach (var (key, chatBase) in chats.chats)
+    //    {
+    //        Console.WriteLine($"Chat Title: {chatBase.Title}," +
+    //                          $"Chat ID: {chatBase.ID}, " +
+    //                          $"Chat Main Username: {chatBase.MainUsername}, " +
+    //                          $"IsGroup: {chatBase.IsGroup}, " +
+    //                          $"IsChannel: {chatBase.IsChannel}, " +
+    //                          $"IsActive: {chatBase.IsActive}");
+    //    }
+    //}
 
     private async Task<string> GetUser(Message message, InputPeer chatId)
     {
