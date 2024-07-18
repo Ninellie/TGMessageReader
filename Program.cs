@@ -7,34 +7,29 @@ namespace MessageReader;
 
 public class Program
 {
-    private static TelegramGroupScannerClient _tgClient;
-    private static NotionPageCreator _notionService;
-    private static TelegramGroupScannerBot _tgBotService;
     private static IConfiguration _configuration;
     public static async Task Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
+        builder.Configuration.AddJsonFile($"appsettings.json").Build();
+        _configuration = builder.Configuration.GetRequiredSection("TelegramConfig");
+
         var connection = new Microsoft.Data.Sqlite.SqliteConnection(@"Data Source=WTelegramBot.sqlite");
         var bot = new Bot(Config("bot_token")!, int.Parse(Config("api_id")!), Config("api_hash")!, connection);
+
+        var client = new Client(Config);
+        var myself = await client.LoginBotIfNeeded();
+        Console.WriteLine($"Logged-in as {myself} (id {myself.id})");
+
         builder.Services.AddSingleton(bot);
-        builder.Services.AddHostedService<TelegramGroupScannerBot>();
-        builder.Services.AddHostedService<ScanTaskHandler>();
+        builder.Services.AddSingleton(client);
+        builder.Services.AddSingleton<NotionPageCreator>();
+        builder.Services.AddSingleton<TelegramGroupHistoryGetter>();
+        builder.Services.AddHostedService<TelegramScanTaskHandlerService>();
+        builder.Services.AddHostedService<TelegramUpdateGetterBot>();
+
         var app = builder.Build();
         await app.RunAsync();
-        
-
-        Console.WriteLine("Configuration");
-        var configuration = new ConfigurationBuilder().AddJsonFile($"appsettings.json");
-        var config = configuration.Build();
-
-        // Получение конфигурации для телеграма
-        _configuration = config.GetRequiredSection("TelegramConfig");
-        var whiteList = config.GetRequiredSection("AllowedHosts").Value?.Split(",")!;
-
-        _tgClient = new TelegramGroupScannerClient(_configuration);
-        await _tgClient.Login();
-
-        _notionService = new NotionPageCreator(config.GetRequiredSection("NotionConfig"));
     }
 
     private static string? Config(string what)

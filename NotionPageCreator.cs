@@ -10,7 +10,7 @@ public class NotionPageCreator
 
     public NotionPageCreator(IConfiguration config)
     {
-        _configuration = config;
+        _configuration = config.GetRequiredSection("NotionConfig");
         _client = NotionClientFactory.Create(new ClientOptions
         {
             AuthToken = _configuration["AuthToken"],
@@ -41,7 +41,6 @@ public class NotionPageCreator
 
     private ParagraphBlock GetPageContent(string content)
     {
-
         var paragraphBlock = new ParagraphBlock()
         {
             Paragraph = new ParagraphBlock.Info

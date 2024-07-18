@@ -1,27 +1,19 @@
-﻿using Microsoft.Extensions.Configuration;
-using TL;
+﻿using TL;
 using WTelegram;
 
 namespace MessageReader;
 
-public class TelegramGroupScannerClient
+public class TelegramGroupHistoryGetter
 {
     private readonly Client _client;
-    private readonly IConfiguration _configuration;
 
-    public TelegramGroupScannerClient(IConfiguration config)
+    public TelegramGroupHistoryGetter(Client client)
     {
-        _configuration = config;
-        _client = new Client(Config);
+
+        _client = client;
     }
 
-    public async Task Login()
-    {
-        var myself = await _client.LoginUserIfNeeded();
-        Console.WriteLine($"Logged-in as {myself} (id {myself.id})");
-    }
-
-    public async Task<IEnumerable<MessageData>> GetMessagesFromGroup(string groupMainUsername, DateTime olderThan, DateTime newerThan)
+    public async Task<IEnumerable<MessageData>> GetMessagesInDateRange(string groupMainUsername, DateTime olderThan, DateTime newerThan)
     {
         var messageDataList = new List<MessageData>();
         var chats = await _client.Messages_GetAllChats();
@@ -30,7 +22,7 @@ public class TelegramGroupScannerClient
             Console.WriteLine($"Chats of user {_client.User.username} not found");
             return messageDataList;
         }
-        HandleMessagesChatsLogs(chats);
+        
         var groups = chats.chats.Values.Where(x => x.IsGroup).ToArray();
         var group = groups.FirstOrDefault(x => x.MainUsername == groupMainUsername);
         if (group == null)
@@ -118,20 +110,5 @@ public class TelegramGroupScannerClient
         };
         var userInfo = await _client.Users_GetFullUser(inputUserFromMessage);
         return userInfo.users.FirstOrDefault().Value.MainUsername;
-    }
-    
-    private string? Config(string what)
-    {
-        switch (what)
-        {
-            case "api_id": return _configuration["api_id"];
-            case "api_hash": return _configuration["api_hash"];
-            case "phone_number": return _configuration["phone_number"];
-            case "verification_code": Console.Write("Code: "); return Console.ReadLine();
-            case "first_name": return _configuration["first_name"];      // if sign-up is required
-            case "last_name": return _configuration["last_name"];        // if sign-up is required
-            case "password": return _configuration["password"];     // if user has enabled 2FA
-            default: return null;                  // let WTelegramClient decide the default config
-        }
     }
 }
