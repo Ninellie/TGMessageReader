@@ -9,20 +9,20 @@ public class TelegramGroupHistoryGetter
 
     public TelegramGroupHistoryGetter(Client client)
     {
-
         _client = client;
     }
 
     public async Task<IEnumerable<MessageData>> GetMessagesInDateRange(string groupMainUsername, DateTime olderThan, DateTime newerThan)
     {
-        var messageDataList = new List<MessageData>();
+        Console.WriteLine($"Getting messages from {groupMainUsername}");
+        var messageDataList = new HashSet<MessageData>();
         var chats = await _client.Messages_GetAllChats();
         if (chats == null)
         {
             Console.WriteLine($"Chats of user {_client.User.username} not found");
             return messageDataList;
         }
-        
+
         var groups = chats.chats.Values.Where(x => x.IsGroup).ToArray();
         var group = groups.FirstOrDefault(x => x.MainUsername == groupMainUsername);
         if (group == null)
@@ -36,8 +36,8 @@ public class TelegramGroupHistoryGetter
         var messagesBaseNewerThan = await _client.Messages_GetHistory(group, limit: 1, offset_date: newerThan);
         var oldestId = messagesBaseNewerThan.Messages[0].ID;
         
-        var validMessages = new List<Message>();
-        var messageBaseList = new List<MessageBase>();
+        var validMessages = new HashSet<Message>();
+        var messageBaseList = new HashSet<MessageBase>();
         Console.WriteLine($"OldestId: {oldestId}. NewestId: {newestId}, Excepting {newestId-oldestId} base messages");
         var count = 0;
         while (oldestId < newestId)

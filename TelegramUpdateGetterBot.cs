@@ -8,26 +8,30 @@ namespace MessageReader;
 public class TelegramUpdateGetterBot : IHostedService
 {
     private readonly Bot _bot;
-    private readonly TelegramScanTaskHandlerService _telegramScanTaskHandlerService;
+    private readonly ScanTaskQueue _scanQueue;
     private readonly string[]? _whiteList;
 
-    public TelegramUpdateGetterBot(Bot bot, IConfiguration config, TelegramScanTaskHandlerService telegramScanTaskHandlerService)
+    public TelegramUpdateGetterBot(Bot bot, IConfiguration config, ScanTaskQueue scanScanQueue)
     {
         _bot = bot;
         _whiteList = config.GetRequiredSection("AllowedHosts").Value?.Split(",");
-        _telegramScanTaskHandlerService = telegramScanTaskHandlerService;
+        _scanQueue = scanScanQueue;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         Console.WriteLine("___________________________________________________\n");
         Console.WriteLine("Update Getter Bot Start Receiving bot updates");
+        Task.Run(async ()=> await GetUpdate(cancellationToken), cancellationToken);
+    }
 
+    private async Task GetUpdate(CancellationToken cancellationToken)
+    {
         await _bot.DropPendingUpdates();
 
-        //_bot.WantUnknownTLUpdates = true;
+        _bot.WantUnknownTLUpdates = true;
 
-        for (int offset = 0; ;)
+        for (int offset = 0;;)
         {
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
             var updates = await _bot.GetUpdates(offset, 100, 1, Bot.AllUpdateTypes, cancellationToken);
@@ -47,7 +51,7 @@ public class TelegramUpdateGetterBot : IHostedService
                             {
                                 if (TryParseScanRequest(text, out var scanTask, message.Chat))
                                 {
-                                    _telegramScanTaskHandlerService.Enqueue(scanTask);
+                                    _scanQueue.Enqueue(scanTask);
                                 }
                             }
                             else if (text == "/help")
@@ -57,7 +61,8 @@ public class TelegramUpdateGetterBot : IHostedService
                             }
                             else
                             {
-                                await _bot.SendTextMessage(message.Chat, $"Hello, {message.From}! Write /help for available commands.");
+                                await _bot.SendTextMessage(message.Chat,
+                                    $"Hello, {message.From}! Write /help for available commands.");
                             }
                         }
                         else
@@ -69,17 +74,21 @@ public class TelegramUpdateGetterBot : IHostedService
                     {
                         //---> Show some update types that are unsupported by Bot API but can be handled via TLUpdate
                         if (update.TLUpdate is TL.UpdateDeleteChannelMessages udcm)
-                            Console.WriteLine($"{udcm.messages.Length} message(s) deleted in {_bot.Chat(udcm.channel_id)?.Title}");
+                            Console.WriteLine(
+                                $"{udcm.messages.Length} message(s) deleted in {_bot.Chat(udcm.channel_id)?.Title}");
                         else if (update.TLUpdate is TL.UpdateDeleteMessages udm)
-                            Console.WriteLine($"{udm.messages.Length} message(s) deleted in user chat or small private group");
+                            Console.WriteLine(
+                                $"{udm.messages.Length} message(s) deleted in user chat or small private group");
                         else if (update.TLUpdate is TL.UpdateReadChannelOutbox urco)
-                            Console.WriteLine($"Someone read {_bot.Chat(urco.channel_id)?.Title} up to message {urco.max_id}");
+                            Console.WriteLine(
+                                $"Someone read {_bot.Chat(urco.channel_id)?.Title} up to message {urco.max_id}");
                     }
                 }
                 catch (Exception ex)
                 {
                     Console.WriteLine("An error occured: " + ex.Message);
                 }
+
                 offset = updates[^1].Id + 1;
             }
         }
@@ -104,12 +113,12 @@ public class TelegramUpdateGetterBot : IHostedService
         }
 
         var request = requestString.Trim().Split('/');
-
-        if (!request[0].StartsWith("/Scan"))
+        request[1] = request[1].ToLower();
+        if (!request[1].StartsWith("scan"))
         {
             if (chat != null)
             {
-                _bot.SendTextMessage(chat, "request must be valid");
+                _bot.SendTextMessage(chat, "request must starts with /scan");
             }
             return false;
         }
@@ -117,13 +126,13 @@ public class TelegramUpdateGetterBot : IHostedService
         var scanDepth = -1;
         var olderThan = DateTime.Now;
 
-        var groupName = request[1];
+        var groupName = request[2];
         if (groupName.StartsWith("@"))
         {
             groupName = groupName.Remove(0, 1);
         }
 
-        if (IsValidString(groupName))
+        if (!IsValidString(groupName))
         {
             if (chat != null)
             {
@@ -134,9 +143,9 @@ public class TelegramUpdateGetterBot : IHostedService
 
         //todo добавить туть проверку на существование группы
 
-        if (request.Length >= 2)
+        if (request.Length >= 3)
         {
-            var depth = request[2];
+            var depth = request[3];
             if (!string.IsNullOrEmpty(depth) && !string.IsNullOrWhiteSpace(depth))
             {
                 scanDepth = int.Parse(depth) * -1;
@@ -154,7 +163,7 @@ public class TelegramUpdateGetterBot : IHostedService
 
         scanTask.GroupName = groupName;
         scanTask.OlderThan = olderThan;
-        scanTask.NewerThan = new DateTime().AddHours(scanDepth);
+        scanTask.NewerThan = olderThan.AddHours(scanDepth);
         scanTask.Chat = chat;
 
         return true;

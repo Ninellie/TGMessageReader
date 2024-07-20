@@ -1,5 +1,4 @@
-﻿using System.Collections.Concurrent;
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using WTelegram;
 
 namespace MessageReader;
@@ -8,27 +7,35 @@ public class TelegramScanTaskHandlerService : IHostedService
 {
     private readonly Bot _bot;
     private readonly TelegramGroupHistoryGetter _client;
-    private readonly NotionPageCreator _notionClient;
-    private readonly ConcurrentQueue<ScanTask> _queue = new();
+    private readonly ScanTaskQueue _scanQueue;
+    private readonly NotionPageCreateTaskQueue _notionQueue;
 
-    public TelegramScanTaskHandlerService(Bot bot, TelegramGroupHistoryGetter client, NotionPageCreator notionClient)
+    public TelegramScanTaskHandlerService(Bot bot, TelegramGroupHistoryGetter client, ScanTaskQueue scanQueue, NotionPageCreateTaskQueue notionQueue)
     {
         _bot = bot;
         _client = client;
-        _notionClient = notionClient;
-    }
-
-    public void Enqueue(ScanTask task)
-    {
-        _queue.Enqueue(task);
+        _scanQueue = scanQueue;
+        _notionQueue = notionQueue;
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
-        for (;;)
+        Console.WriteLine("___________________________________________________\n");
+        Console.WriteLine("Scan Task Handler Service just start");
+        Task.Run(async () => await Scan(cancellationToken), cancellationToken);
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    private async Task Scan(CancellationToken cancellationToken)
+    {
+        for (; ; )
         {
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-            if (!_queue.TryDequeue(out var task)) continue;
+            if (!_scanQueue.TryDequeue(out var task)) continue;
             var isReporting = task.Chat != null;
             if (isReporting)
             {
@@ -39,11 +46,6 @@ public class TelegramScanTaskHandlerService : IHostedService
             }
             await TryScan(task);
         }
-    }
-
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
     }
 
     private async Task TryScan(ScanTask task)
@@ -59,10 +61,11 @@ public class TelegramScanTaskHandlerService : IHostedService
         if (!messagesFromGroup.Any())
         {
             if (task.Chat != null)
+            {
                 await _bot.SendTextMessage(task.Chat, $"No messages were found in group {groupName} " +
                                                       $"between {task.NewerThan.ToShortTimeString()} " +
                                                       $"and {task.OlderThan.ToShortTimeString()}");
-            
+            }
             return;
         }
 
@@ -78,7 +81,7 @@ public class TelegramScanTaskHandlerService : IHostedService
 
         foreach (var msg in messagesFromGroup)
         {
-            await _notionClient.CreateMessagePage(msg);
+            _notionQueue.Enqueue(msg);
         }
 
         if (task.Chat != null)

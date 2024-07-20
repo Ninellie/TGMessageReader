@@ -10,7 +10,7 @@ public class MessageData
     public string PostAuthor { get; }
     public string ChatTitle { get; }
 
-    public MessageData(string content, int id, DateTime date, string postAuthor, string chatTitle, bool writeLogs = true)
+    public MessageData(string content, int id, DateTime date, string postAuthor, string chatTitle, bool writeLogs = false)
     {
         Content = content;
         Id = id;

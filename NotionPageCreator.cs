@@ -1,15 +1,18 @@
 ﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Notion.Client;
 
 namespace MessageReader;
 
-public class NotionPageCreator
+public class NotionPageCreator : IHostedService
 {
+    private readonly NotionPageCreateTaskQueue _queue;
     private readonly NotionClient _client;
     private readonly IConfiguration _configuration;
 
-    public NotionPageCreator(IConfiguration config)
+    public NotionPageCreator(IConfiguration config, NotionPageCreateTaskQueue queue)
     {
+        _queue = queue;
         _configuration = config.GetRequiredSection("NotionConfig");
         _client = NotionClientFactory.Create(new ClientOptions
         {
@@ -18,7 +21,29 @@ public class NotionPageCreator
             NotionVersion = _configuration["2022-06-28"]
         });
     }
-    
+
+    public async Task StartAsync(CancellationToken cancellationToken)
+    {
+        Task.Run(async () => await Scan(cancellationToken), cancellationToken);
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    private async Task Scan(CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            if (_queue.TryDequeue(out var msg))
+            {
+                await CreateMessagePage(msg);
+            }
+        }
+    }
+
     public async Task CreateMessagePage(MessageData data)
     {
         var databaseParentInput = new DatabaseParentInput
@@ -41,7 +66,7 @@ public class NotionPageCreator
 
     private ParagraphBlock GetPageContent(string content)
     {
-        var paragraphBlock = new ParagraphBlock()
+        var paragraphBlock = new ParagraphBlock
         {
             Paragraph = new ParagraphBlock.Info
             {
