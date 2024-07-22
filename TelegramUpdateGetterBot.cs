@@ -5,7 +5,7 @@ using Bot = WTelegram.Bot;
 
 namespace MessageReader;
 
-public class TelegramUpdateGetterBot : IHostedService
+public class TelegramUpdateGetterBot : BackgroundService
 {
     private readonly Bot _bot;
     private readonly ScanTaskQueue _scanQueue;
@@ -18,23 +18,18 @@ public class TelegramUpdateGetterBot : IHostedService
         _scanQueue = scanScanQueue;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Console.WriteLine("___________________________________________________\n");
-        Console.WriteLine("Update Getter Bot Start Receiving bot updates");
-        Task.Run(async ()=> await GetUpdate(cancellationToken), cancellationToken);
-    }
+        Console.WriteLine("Update Getter Bot start receiving bot updates");
 
-    private async Task GetUpdate(CancellationToken cancellationToken)
-    {
         await _bot.DropPendingUpdates();
-
         _bot.WantUnknownTLUpdates = true;
-
-        for (int offset = 0;;)
+        int offset = 0;
+        while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
-            var updates = await _bot.GetUpdates(offset, 100, 1, Bot.AllUpdateTypes, cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
+            var updates = await _bot.GetUpdates(offset, 100, 1, Bot.AllUpdateTypes, stoppingToken);
             foreach (var update in updates)
             {
                 try
@@ -51,6 +46,7 @@ public class TelegramUpdateGetterBot : IHostedService
                             {
                                 if (TryParseScanRequest(text, out var scanTask, message.Chat))
                                 {
+                                    // Если пользователь отправил команду скана, то отправить задачу в очередь на сканирование
                                     _scanQueue.Enqueue(scanTask);
                                 }
                             }
@@ -167,10 +163,5 @@ public class TelegramUpdateGetterBot : IHostedService
         scanTask.Chat = chat;
 
         return true;
-    }
-
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
     }
 }

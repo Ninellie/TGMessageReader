@@ -3,10 +3,11 @@ using Microsoft.Extensions.Hosting;
 
 namespace MessageReader;
 
-public class ScanTimerService : IHostedService
+public class ScanTimerService : BackgroundService
 {
     private readonly ScanTaskQueue _scanTaskQueue;
     private readonly IConfiguration _groups;
+    private const int MaxTaskScanInterval = 1;
 
     public ScanTimerService(IConfiguration config, ScanTaskQueue scanTaskQueue)
     {
@@ -14,19 +15,16 @@ public class ScanTimerService : IHostedService
         _groups = config.GetSection("ScanConfig").GetSection("Groups");
     }
 
-
-    public async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Task.Run(async () => await SetTimedScan(cancellationToken), cancellationToken);
-    }
+        Console.WriteLine("___________________________________________________\n");
+        Console.WriteLine("Scan Timer Service start");
 
-    private async Task SetTimedScan(CancellationToken cancellationToken)
-    {
-        for (;;)
+        while (!stoppingToken.IsCancellationRequested)
         {
+            var now = DateTime.Now;
             foreach (var group in _groups.AsEnumerable())
             {
-                var scanTask = new ScanTask();
                 var groupName = group.Value;
                 if (groupName == null)
                 {
@@ -36,17 +34,19 @@ public class ScanTimerService : IHostedService
                 {
                     groupName = groupName.Remove(0, 1);
                 }
-                scanTask.GroupName = groupName;
-                scanTask.NewerThan = DateTime.Now.AddHours(-2 - 12).AddMinutes(-10).AddSeconds(10);
-                scanTask.OlderThan = DateTime.Now.AddHours(-2 - 12);
-                _scanTaskQueue.Enqueue(scanTask);
+                for (int i = 0; i < 24; i++)
+                { 
+                    var scanTask = new ScanTask
+                    {
+                        GroupName = groupName,
+                        NewerThan = now.AddDays(-2).AddHours(i),
+                        OlderThan = now.AddDays(-2).AddHours(i+MaxTaskScanInterval)
+                    };
+                    _scanTaskQueue.Enqueue(scanTask);
+                }
             }
-            await Task.Delay(TimeSpan.FromMinutes(10), cancellationToken);
+            //await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken);
+            await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
         }
-    }
-
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
     }
 }

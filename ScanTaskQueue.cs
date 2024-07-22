@@ -13,6 +13,6 @@ public class ScanTaskQueue
 
     public bool TryDequeue(out ScanTask scanTask)
     {
-        return _queue.TryDequeue(out scanTask);
+        return _queue.TryDequeue(out scanTask!);
     }
 }

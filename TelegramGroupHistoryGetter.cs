@@ -1,4 +1,5 @@
-﻿using TL;
+﻿using System.Globalization;
+using TL;
 using WTelegram;
 
 namespace MessageReader;
@@ -12,10 +13,11 @@ public class TelegramGroupHistoryGetter
         _client = client;
     }
 
-    public async Task<IEnumerable<MessageData>> GetMessagesInDateRange(string groupMainUsername, DateTime olderThan, DateTime newerThan)
+    public async Task<List<MessageData>> GetMessagesInDateRange(string groupMainUsername, DateTime olderThan, DateTime newerThan, int? oldestId = null)
     {
+        Console.WriteLine("___________________________________________________\n");
         Console.WriteLine($"Getting messages from {groupMainUsername}");
-        var messageDataList = new HashSet<MessageData>();
+        var messageDataList = new List<MessageData>();
         var chats = await _client.Messages_GetAllChats();
         if (chats == null)
         {
@@ -25,58 +27,72 @@ public class TelegramGroupHistoryGetter
 
         var groups = chats.chats.Values.Where(x => x.IsGroup).ToArray();
         var group = groups.FirstOrDefault(x => x.MainUsername == groupMainUsername);
+
         if (group == null)
         { 
             Console.WriteLine($"Group with main username: {groupMainUsername} not found in chat list of user {_client.User.username}");
             return messageDataList;
         }
-        Console.WriteLine($"Scanning group: {group.Title} ({group.MainUsername}) started");
+
+        Console.WriteLine($"Scanning group: \n" +
+                          $"Group info:\n" +
+                          $"Title: {group.Title}\n" +
+                          $"MainUsername: {group.MainUsername}\n" +
+                          $"ID: {group.ID}");
+        
         var messagesBaseOlderThan = await _client.Messages_GetHistory(group, limit: 1, offset_date: olderThan);
         var newestId = messagesBaseOlderThan.Messages[0].ID;
         var messagesBaseNewerThan = await _client.Messages_GetHistory(group, limit: 1, offset_date: newerThan);
-        var oldestId = messagesBaseNewerThan.Messages[0].ID;
-        
-        var validMessages = new HashSet<Message>();
-        var messageBaseList = new HashSet<MessageBase>();
+        oldestId ??= messagesBaseNewerThan.Messages[0].ID;
+        var expected = newestId - oldestId.Value;
+
         Console.WriteLine($"OldestId: {oldestId}. NewestId: {newestId}, Excepting {newestId-oldestId} base messages");
-        var count = 0;
-        while (oldestId < newestId)
+
+        if (expected == 0)
         {
-            count++;
-            Console.WriteLine(count);
-            var groupMessages = await _client.Messages_GetHistory(group, limit: 100, offset_id: oldestId, add_offset: -100);
-            if (groupMessages.Messages.Length == 0)
-            { 
-                Console.WriteLine($"GroupMessages count: {groupMessages.Messages.Length}");
-                return messageDataList;
-            }
-            Console.WriteLine($"GroupMessages count: {groupMessages.Count}");
-            Console.WriteLine($"Messages count: {groupMessages.Messages.Length}");
-            foreach (var messageBase in groupMessages.Messages.Reverse())
-            {
-                Console.WriteLine($"Current oldest ID: {oldestId}");
-                Console.WriteLine($"Current message base ID: {messageBase.ID}");
-                Console.WriteLine($"Current message base FROM Id: {messageBase.From.ID}");
-                messageBaseList.Add(messageBase);
-                oldestId = messageBase.ID;
-                if (messageBase.ID > newestId) break;
-            }
+            return messageDataList;
         }
 
-        foreach (var messageBase in messageBaseList)
+        while (true)
         {
-            if (messageBase is not Message validMessage || string.IsNullOrEmpty(validMessage.message)) continue;
-            validMessages.Add(validMessage);
+            var groupMessages = await _client.Messages_GetHistory(group, min_id: oldestId.Value, offset_date: olderThan);
+            var first = groupMessages.Messages.FirstOrDefault();
+            var firstDate = "";
+
+            if (first != null)
+            {
+                firstDate = first.Date.ToString(CultureInfo.InvariantCulture);
+            }
+
+            Console.WriteLine($"Received {groupMessages.Messages.Length} messages from {group.MainUsername}. " +
+                              $"offset id: {oldestId.Value}, " +
+                              $"First date: {firstDate}");
+
+            var inputPeer = group.ToInputPeer();
+            var end = false;
+            foreach (var messageBase in groupMessages.Messages)
+            {
+                if (messageBase.ID >= newestId)
+                {
+                    end = true;
+                    continue;
+                }
+
+                if (messageBase is not Message validMessage || string.IsNullOrEmpty(validMessage.message)) continue;
+
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                var userName = await GetUser(validMessage, inputPeer);
+                messageDataList.Add(new MessageData(validMessage, groupMainUsername, userName));
+                oldestId = validMessage.ID;
+            }
+            
+            if (end)
+            {
+                break;
+            }
+            await Task.Delay(TimeSpan.FromSeconds(5));
         }
-        
-        foreach (var msg in validMessages)
-        {
-            var userName = await GetUser(msg, group.ToInputPeer());
-            var data = new MessageData(msg.message, msg.ID, msg.Date, userName, groupMainUsername); 
-            messageDataList.Add(data);
-        }
-        
-        Console.WriteLine($"Messages received: {messageBaseList.Count}. Valid messages: {validMessages.Count}");
+        Console.WriteLine($"Valid messages received: {messageDataList.Count}");
         return messageDataList;
     }
 

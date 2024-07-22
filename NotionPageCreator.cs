@@ -4,7 +4,7 @@ using Notion.Client;
 
 namespace MessageReader;
 
-public class NotionPageCreator : IHostedService
+public class NotionPageCreator : BackgroundService
 {
     private readonly NotionPageCreateTaskQueue _queue;
     private readonly NotionClient _client;
@@ -22,30 +22,24 @@ public class NotionPageCreator : IHostedService
         });
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Task.Run(async () => await Scan(cancellationToken), cancellationToken);
-    }
+        Console.WriteLine("___________________________________________________\n");
+        Console.WriteLine("Notion Page Creator Service start");
 
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-
-    private async Task Scan(CancellationToken cancellationToken)
-    {
-        while (true)
+        while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             if (_queue.TryDequeue(out var msg))
             {
-                await CreateMessagePage(msg);
+                await CreateMessagePage(msg, stoppingToken);
             }
         }
     }
 
-    public async Task CreateMessagePage(MessageData data)
+    private async Task CreateMessagePage(MessageData data, CancellationToken stoppingToken)
     {
+
         var databaseParentInput = new DatabaseParentInput
         {
             DatabaseId = _configuration["DatabaseId"]
@@ -56,12 +50,21 @@ public class NotionPageCreator : IHostedService
         builder.AddProperty("Group", GetSelectPropertyValue(data.ChatTitle));
         builder.AddProperty("URL", GetUrlPropertyValue($"https://t.me/{data.ChatTitle}/{data.Id}"));
         builder.AddProperty("Tags", GetMultiSelectPropertyValue(data.ExtractHashtags()));
+        builder.AddProperty("Price", GetNumberProperty(data.Price));
         if (!string.IsNullOrEmpty(data.PostAuthor))
         {
             builder.AddProperty("SenderUrl", GetUrlPropertyValue($"https://t.me/{data.PostAuthor}"));
         }
         var page = builder.Build();
-        await _client.Pages.CreateAsync(page);
+        try
+        {
+            await _client.Pages.CreateAsync(page, stoppingToken);
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e); 
+            throw;
+        }
     }
 
     private ParagraphBlock GetPageContent(string content)
@@ -95,6 +98,15 @@ public class NotionPageCreator : IHostedService
             }
         };
         return dateProperty;
+    }
+
+    private NumberPropertyValue GetNumberProperty(double number)
+    {
+        var numberProperty = new NumberPropertyValue
+        {
+            Number = number
+        };
+        return numberProperty;
     }
 
     private SelectPropertyValue GetSelectPropertyValue(string tag)

@@ -3,7 +3,7 @@ using WTelegram;
 
 namespace MessageReader;
 
-public class TelegramScanTaskHandlerService : IHostedService
+public class TelegramScanTaskHandlerService : BackgroundService
 {
     private readonly Bot _bot;
     private readonly TelegramGroupHistoryGetter _client;
@@ -18,23 +18,14 @@ public class TelegramScanTaskHandlerService : IHostedService
         _notionQueue = notionQueue;
     }
 
-    public async Task StartAsync(CancellationToken cancellationToken)
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Console.WriteLine("___________________________________________________\n");
         Console.WriteLine("Scan Task Handler Service just start");
-        Task.Run(async () => await Scan(cancellationToken), cancellationToken);
-    }
 
-    public Task StopAsync(CancellationToken cancellationToken)
-    {
-        return Task.CompletedTask;
-    }
-
-    private async Task Scan(CancellationToken cancellationToken)
-    {
-        for (; ; )
+        while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
+            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
             if (!_scanQueue.TryDequeue(out var task)) continue;
             var isReporting = task.Chat != null;
             if (isReporting)

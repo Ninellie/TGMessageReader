@@ -1,28 +1,51 @@
 ﻿using System.Collections.Concurrent;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace MessageReader;
 
 public class NotionPageCreateTaskQueue
 {
     private readonly ConcurrentQueue<MessageData> _queue = new();
-    private readonly HashSet<string> _contentSet = new(500);
-    private readonly Queue<string> _contentQueue = new(500);
-    private const int MaxHashSetCount = 500;
+    private readonly IMemoryCache _memoryCache;
+
+    public NotionPageCreateTaskQueue(IMemoryCache memoryCache)
+    {
+        _memoryCache = memoryCache;
+    }
+
     public void Enqueue(MessageData messageData)
     {
-        if (_contentSet.Contains(messageData.Content)) return;
+        if (_memoryCache.TryGetValue(messageData.Content, out var existing))
+        {
+            if (existing is not int id) return;
+            if (id == messageData.Id)
+            {
+                Console.WriteLine("Попытка отправить в Notion сообщение с контентом," +
+                                  " который уже был недавно добавлен. " +
+                                  "Однако, Id у этих сообщений разные, что может указывать на то," +
+                                  " что это одинаковое сообщение из разных групп или " +
+                                  "повторяющееся сообщение из одной группы");
+            }
+            else
+            {
+                Console.WriteLine("Попытка отправить в Notion сообщение с контентом," +
+                                  " который уже был недавно добавлен.");
+            }
+            return;
+        }
+
         _queue.Enqueue(messageData);
-        _contentSet.Add(messageData.Content);
-        _contentQueue.Enqueue(messageData.Content);
+
+        _memoryCache.Set(messageData.Content, messageData.Id, new MemoryCacheEntryOptions
+        {
+            SlidingExpiration = TimeSpan.FromHours(2),
+            AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(4),
+            Priority = CacheItemPriority.NeverRemove
+        });
     }
 
     public bool TryDequeue(out MessageData messageData)
     {
-        if (!_queue.TryDequeue(out messageData!)) return false;
-        if (_contentSet.Count == MaxHashSetCount)
-        {
-            _contentSet.Remove(_contentQueue.Dequeue());
-        }
-        return true;
+        return _queue.TryDequeue(out messageData!);
     }
 }
