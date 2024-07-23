@@ -69,22 +69,39 @@ public class NotionPageCreator : BackgroundService
 
     private ParagraphBlock GetPageContent(string content)
     {
+        var richTextList = new List<RichTextBase>();
+        const int richTextMaxLength = 2000;
+
+        for (int i = 0; i < content.Length;)
+        {
+            if (string.IsNullOrEmpty(content))
+            {
+                break;
+            }
+
+            var text = content.Substring(i, int.Min(richTextMaxLength, content.Length - i));
+
+            var richText = new RichTextText
+            {
+                Text = new Text
+                {
+                    Content = text
+                }
+            };
+
+            richTextList.Add(richText);
+
+            i += text.Length;
+        }
+
         var paragraphBlock = new ParagraphBlock
         {
             Paragraph = new ParagraphBlock.Info
             {
-                RichText = new List<RichTextBase>
-                {
-                    new RichTextText
-                    {
-                        Text = new Text
-                        {
-                            Content = content
-                        }
-                    }
-                }
+                RichText = richTextList
             }
         };
+
         return paragraphBlock;
     }
 
