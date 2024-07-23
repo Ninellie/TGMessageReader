@@ -148,6 +148,9 @@ public class MessageData
             }if (formattedHashtag.StartsWith("Сда"))
             {
                 formattedHashtag = "Аренда";
+            }if (formattedHashtag.StartsWith("Рент"))
+            {
+                formattedHashtag = "Аренда";
             }if (formattedHashtag.StartsWith("Сни"))
             {
                 formattedHashtag = "Сниму";
