@@ -7,7 +7,7 @@ public class ScanTimerService : BackgroundService
 {
     private readonly ScanTaskQueue _scanTaskQueue;
     private readonly IConfiguration _groups;
-    private const int MaxTaskScanInterval = 1;
+    private const int ScanIntervalInDays = 1;
 
     public ScanTimerService(IConfiguration config, ScanTaskQueue scanTaskQueue)
     {
@@ -19,34 +19,19 @@ public class ScanTimerService : BackgroundService
     {
         Console.WriteLine("___________________________________________________\n");
         Console.WriteLine("Scan Timer Service start");
-
         while (!stoppingToken.IsCancellationRequested)
         {
-            var now = DateTime.Now;
             foreach (var group in _groups.AsEnumerable())
             {
-                var groupName = group.Value;
-                if (groupName == null)
+                if (group.Value == null) continue;
+                var tasks = ScanTask.GetScanTasks(group.Value, ScanIntervalInDays * 24, DateTime.Today);
+                foreach (var task in tasks)
                 {
-                    continue;
-                }
-                if (groupName.StartsWith("@"))
-                {
-                    groupName = groupName.Remove(0, 1);
-                }
-                for (int i = 0; i < 24; i++)
-                { 
-                    var scanTask = new ScanTask
-                    {
-                        GroupName = groupName,
-                        NewerThan = now.AddDays(-2).AddHours(i),
-                        OlderThan = now.AddDays(-2).AddHours(i+MaxTaskScanInterval)
-                    };
-                    _scanTaskQueue.Enqueue(scanTask);
+                    _scanTaskQueue.Enqueue(task);
                 }
             }
-            //await Task.Delay(TimeSpan.FromMinutes(10), stoppingToken);
-            await Task.Delay(TimeSpan.FromDays(1), stoppingToken);
+            await Task.Delay(TimeSpan.FromDays(ScanIntervalInDays), stoppingToken);
         }
     }
+
 }

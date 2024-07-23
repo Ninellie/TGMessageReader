@@ -105,7 +105,7 @@ public class NotionPageCreator : BackgroundService
         return paragraphBlock;
     }
 
-    private DatePropertyValue GetDateProperty(DateTime date)
+    private static DatePropertyValue GetDateProperty(DateTime date)
     {
         var dateProperty = new DatePropertyValue
         {
@@ -117,7 +117,7 @@ public class NotionPageCreator : BackgroundService
         return dateProperty;
     }
 
-    private NumberPropertyValue GetNumberProperty(double number)
+    private static NumberPropertyValue GetNumberProperty(double number)
     {
         var numberProperty = new NumberPropertyValue
         {
@@ -126,7 +126,7 @@ public class NotionPageCreator : BackgroundService
         return numberProperty;
     }
 
-    private SelectPropertyValue GetSelectPropertyValue(string tag)
+    private static SelectPropertyValue GetSelectPropertyValue(string tag)
     {
         var selectProperty = new SelectPropertyValue
         {
@@ -138,7 +138,7 @@ public class NotionPageCreator : BackgroundService
         return selectProperty;
     }
     
-    private MultiSelectPropertyValue GetMultiSelectPropertyValue(IEnumerable<string> tags)
+    private static MultiSelectPropertyValue GetMultiSelectPropertyValue(IEnumerable<string> tags)
     {
         var multiSelectProperty = new MultiSelectPropertyValue
         {
@@ -155,7 +155,7 @@ public class NotionPageCreator : BackgroundService
         return multiSelectProperty;
     }
 
-    private UrlPropertyValue GetUrlPropertyValue(string url)
+    private static UrlPropertyValue GetUrlPropertyValue(string url)
     {
         var urlProperty = new UrlPropertyValue
         {

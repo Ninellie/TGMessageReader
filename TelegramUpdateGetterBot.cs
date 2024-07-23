@@ -44,10 +44,13 @@ public class TelegramUpdateGetterBot : BackgroundService
                             }
                             else if (text.StartsWith("/scan"))
                             {
-                                if (TryParseScanRequest(text, out var scanTask, message.Chat))
+                                if (TryParseScanRequest(text, out var scanTasks, message.Chat))
                                 {
-                                    // Если пользователь отправил команду скана, то отправить задачу в очередь на сканирование
-                                    _scanQueue.Enqueue(scanTask);
+                                    // Если пользователь отправил команду скана, то отправить задачи в очередь на сканирование
+                                    foreach (var task in scanTasks)
+                                    {
+                                        _scanQueue.Enqueue(task);
+                                    }
                                 }
                             }
                             else if (text == "/help")
@@ -95,9 +98,9 @@ public class TelegramUpdateGetterBot : BackgroundService
         return !string.IsNullOrEmpty(text) && !string.IsNullOrWhiteSpace(text);
     }
 
-    private bool TryParseScanRequest(string requestString, out ScanTask scanTask, Telegram.Bot.Types.Chat? chat = null)
+    private bool TryParseScanRequest(string requestString, out List<ScanTask> scanTasks, Telegram.Bot.Types.Chat? chat = null)
     {
-        scanTask = new ScanTask();
+        scanTasks = new List<ScanTask>();
 
         if (!IsValidString(requestString))
         {
@@ -120,7 +123,6 @@ public class TelegramUpdateGetterBot : BackgroundService
         }
 
         var scanDepth = -1;
-        var olderThan = DateTime.Now;
 
         var groupName = request[2];
         if (groupName.StartsWith("@"))
@@ -157,11 +159,9 @@ public class TelegramUpdateGetterBot : BackgroundService
             }
         }
 
-        scanTask.GroupName = groupName;
-        scanTask.OlderThan = olderThan;
-        scanTask.NewerThan = olderThan.AddHours(scanDepth);
-        scanTask.Chat = chat;
-
+        scanTasks = ScanTask.GetScanTasks(groupName, scanDepth, DateTime.Now, chat: chat);
         return true;
+        
+
     }
 }
