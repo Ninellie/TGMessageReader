@@ -1,4 +1,5 @@
 ﻿using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using WTelegram;
 
 namespace MessageReader;
@@ -9,19 +10,22 @@ public class TelegramScanTaskHandlerService : BackgroundService
     private readonly TelegramGroupHistoryGetter _client;
     private readonly ScanTaskQueue _scanQueue;
     private readonly NotionPageCreateTaskQueue _notionQueue;
+    private readonly ILogger<TelegramScanTaskHandlerService> _logger;
 
-    public TelegramScanTaskHandlerService(Bot bot, TelegramGroupHistoryGetter client, ScanTaskQueue scanQueue, NotionPageCreateTaskQueue notionQueue)
+    public TelegramScanTaskHandlerService(Bot bot, TelegramGroupHistoryGetter client, ScanTaskQueue scanQueue,
+        NotionPageCreateTaskQueue notionQueue, ILogger<TelegramScanTaskHandlerService> logger)
     {
         _bot = bot;
         _client = client;
         _scanQueue = scanQueue;
         _notionQueue = notionQueue;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Console.WriteLine("___________________________________________________\n");
-        Console.WriteLine("Scan Task Handler Service just start");
+        _logger.LogInformation("___________________________________________________\n");
+        _logger.LogInformation("Scan Task Handler Service just start");
 
         while (!stoppingToken.IsCancellationRequested)
         {

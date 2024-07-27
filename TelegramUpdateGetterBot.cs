@@ -1,27 +1,78 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Telegram.Bot.Types.Enums;
-using Bot = WTelegram.Bot;
+using WTelegram;
+using Chat = Telegram.Bot.Types.Chat;
 
 namespace MessageReader;
+
+public enum RequestState
+{
+    WaitingForScan,
+    WaitingForScanRequest,
+}
+
+public abstract class BotRequestHandler
+{
+    protected string CurrentResponseMessage { get; set; }
+    protected string LastReceivedMessage { get; set; }
+
+    protected readonly Bot bot;
+    protected readonly Chat chat;
+    protected RequestState state;
+
+    protected BotRequestHandler(Bot bot, Chat chat, RequestState state, string lastReceivedMessage)
+    {
+        this.bot = bot;
+        this.chat = chat;
+        this.state = state;
+        LastReceivedMessage = lastReceivedMessage;
+        CurrentResponseMessage = "";
+    }
+
+    public abstract Task Start();
+    public abstract Task End();
+}
+
+class ScanHandler : BotRequestHandler
+{
+    public ScanHandler(Bot bot, Chat chat, RequestState state, string lastReceivedMessage) : base(bot, chat, state, lastReceivedMessage)
+    {
+    }
+
+    public override Task Start()
+    {
+        throw new NotImplementedException();
+    }
+
+    public override Task End()
+    {
+        throw new NotImplementedException();
+    }
+}
 
 public class TelegramUpdateGetterBot : BackgroundService
 {
     private readonly Bot _bot;
     private readonly ScanTaskQueue _scanQueue;
+    private readonly ILogger<TelegramUpdateGetterBot> _logger;
     private readonly string[]? _whiteList;
 
-    public TelegramUpdateGetterBot(Bot bot, IConfiguration config, ScanTaskQueue scanScanQueue)
+    //private readonly List<BotRequestHandler> _requestHandlers = new();
+
+    public TelegramUpdateGetterBot(Bot bot, IConfiguration config, ScanTaskQueue scanScanQueue, ILogger<TelegramUpdateGetterBot> logger)
     {
         _bot = bot;
         _whiteList = config.GetRequiredSection("AllowedHosts").Value?.Split(",");
         _scanQueue = scanScanQueue;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Console.WriteLine("___________________________________________________\n");
-        Console.WriteLine("Update Getter Bot start receiving bot updates");
+        _logger.LogInformation("___________________________________________________\n");
+        _logger.LogInformation("Update Getter Bot start receiving bot updates");
 
         await _bot.DropPendingUpdates();
         _bot.WantUnknownTLUpdates = true;
@@ -73,19 +124,19 @@ public class TelegramUpdateGetterBot : BackgroundService
                     {
                         //---> Show some update types that are unsupported by Bot API but can be handled via TLUpdate
                         if (update.TLUpdate is TL.UpdateDeleteChannelMessages udcm)
-                            Console.WriteLine(
+                            _logger.LogInformation(
                                 $"{udcm.messages.Length} message(s) deleted in {_bot.Chat(udcm.channel_id)?.Title}");
                         else if (update.TLUpdate is TL.UpdateDeleteMessages udm)
-                            Console.WriteLine(
+                            _logger.LogInformation(
                                 $"{udm.messages.Length} message(s) deleted in user chat or small private group");
                         else if (update.TLUpdate is TL.UpdateReadChannelOutbox urco)
-                            Console.WriteLine(
+                            _logger.LogInformation(
                                 $"Someone read {_bot.Chat(urco.channel_id)?.Title} up to message {urco.max_id}");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine("An error occured: " + ex.Message);
+                    _logger.LogInformation("An error occured: " + ex.Message);
                 }
 
                 offset = updates[^1].Id + 1;
@@ -98,7 +149,7 @@ public class TelegramUpdateGetterBot : BackgroundService
         return !string.IsNullOrEmpty(text) && !string.IsNullOrWhiteSpace(text);
     }
 
-    private bool TryParseScanRequest(string requestString, out List<ScanTask> scanTasks, Telegram.Bot.Types.Chat? chat = null)
+    private bool TryParseScanRequest(string requestString, out List<ScanTask> scanTasks, Chat? chat = null)
     {
         scanTasks = new List<ScanTask>();
 

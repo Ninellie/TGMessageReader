@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Notion.Client;
 
 namespace MessageReader;
@@ -7,12 +8,14 @@ namespace MessageReader;
 public class NotionPageCreator : BackgroundService
 {
     private readonly NotionPageCreateTaskQueue _queue;
+    private readonly ILogger<NotionPageCreator> _logger;
     private readonly NotionClient _client;
     private readonly IConfiguration _configuration;
 
-    public NotionPageCreator(IConfiguration config, NotionPageCreateTaskQueue queue)
+    public NotionPageCreator(IConfiguration config, NotionPageCreateTaskQueue queue, ILogger<NotionPageCreator> logger)
     {
         _queue = queue;
+        _logger = logger;
         _configuration = config.GetRequiredSection("NotionConfig");
         _client = NotionClientFactory.Create(new ClientOptions
         {
@@ -24,8 +27,8 @@ public class NotionPageCreator : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        Console.WriteLine("___________________________________________________\n");
-        Console.WriteLine("Notion Page Creator Service start");
+        _logger.LogInformation("___________________________________________________\n");
+        _logger.LogInformation("Notion Page Creator Service start");
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -51,6 +54,7 @@ public class NotionPageCreator : BackgroundService
         builder.AddProperty("URL", GetUrlPropertyValue($"https://t.me/{data.ChatTitle}/{data.Id}"));
         builder.AddProperty("Tags", GetMultiSelectPropertyValue(data.ExtractHashtags()));
         builder.AddProperty("Price", GetNumberProperty(data.Price));
+        
         if (!string.IsNullOrEmpty(data.PostAuthor))
         {
             builder.AddProperty("SenderUrl", GetUrlPropertyValue($"https://t.me/{data.PostAuthor}"));

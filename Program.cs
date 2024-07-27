@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using WTelegram;
 
 namespace MessageReader;
@@ -11,9 +12,11 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
+        var fileLoggerProvider = new FileLoggerProvider("log.txt");
+        builder.Logging.AddProvider(fileLoggerProvider);
+
         var bot = CreateBot(builder.Configuration);
         var client = await CreateClient(builder.Configuration);
-
         builder.Services.AddSingleton(bot);
         builder.Services.AddSingleton(client);
         builder.Services.AddSingleton<ScanTaskQueue>();
@@ -24,7 +27,6 @@ public class Program
         builder.Services.AddHostedService<TelegramUpdateGetterBot>();
         builder.Services.AddHostedService<TelegramScanTaskHandlerService>();
         builder.Services.AddHostedService<ScanTimerService>();
-
         builder.Services.AddMemoryCache();
 
         var app = builder.Build();
