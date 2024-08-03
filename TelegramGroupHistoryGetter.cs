@@ -1,4 +1,5 @@
 ﻿using System.Globalization;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using TL;
 using WTelegram;
@@ -11,11 +12,13 @@ public class TelegramGroupHistoryGetter
     private readonly ILogger<TelegramGroupHistoryGetter> _logger;
     private const int UserGetterDelay = 2;
     private const int MessageGetterDelay = 5;
+    private readonly IConfiguration _configuration;
 
-    public TelegramGroupHistoryGetter(Client client, ILogger<TelegramGroupHistoryGetter> logger)
+    public TelegramGroupHistoryGetter(Client client, ILogger<TelegramGroupHistoryGetter> logger, IConfiguration configuration)
     {
         _client = client;
         _logger = logger;
+        _configuration = configuration;
     }
 
     public async Task<List<MessageData>> GetMessagesInDateRange(string groupMainUsername, DateTime olderThan, DateTime newerThan, int? oldestId = null)
@@ -86,9 +89,17 @@ public class TelegramGroupHistoryGetter
                 if (messageBase is not Message validMessage || string.IsNullOrEmpty(validMessage.message)) continue;
 
                 await Task.Delay(TimeSpan.FromSeconds(UserGetterDelay));
+                
                 var userName = await GetUser(validMessage, inputPeer);
-                //var userName = 
-                messageDataList.Add(new MessageData(validMessage, groupMainUsername, userName));
+
+                var notionConfigSection = _configuration.GetSection("NotionConfig");
+
+                var notionDatabaseIdListSection = notionConfigSection.GetSection("DatabaseId");
+                
+                var notionDatabaseIdList = (from dbId in notionDatabaseIdListSection.AsEnumerable()
+                    where dbId.Value != null select dbId.Value).ToList();
+
+                messageDataList.Add(new MessageData(validMessage, groupMainUsername, userName, notionDatabaseIdList!));
                 oldestId = validMessage.ID;
             }
             

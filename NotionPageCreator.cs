@@ -10,18 +10,19 @@ public class NotionPageCreator : BackgroundService
     private readonly NotionPageCreateTaskQueue _queue;
     private readonly ILogger<NotionPageCreator> _logger;
     private readonly NotionClient _client;
-    private readonly IConfiguration _configuration;
+    private const int MaxPagesCreate = 10;
+    private const int CreatePagesDelaySecond = 10;
 
     public NotionPageCreator(IConfiguration config, NotionPageCreateTaskQueue queue, ILogger<NotionPageCreator> logger)
     {
         _queue = queue;
         _logger = logger;
-        _configuration = config.GetRequiredSection("NotionConfig");
+        IConfiguration configuration = config.GetRequiredSection("NotionConfig");
         _client = NotionClientFactory.Create(new ClientOptions
         {
-            AuthToken = _configuration["AuthToken"],
-            BaseUrl = _configuration["BaseUrl"],
-            NotionVersion = _configuration["2022-06-28"]
+            AuthToken = configuration["AuthToken"],
+            BaseUrl = configuration["BaseUrl"],
+            NotionVersion = configuration["2022-06-28"]
         });
     }
 
@@ -32,20 +33,44 @@ public class NotionPageCreator : BackgroundService
 
         while (!stoppingToken.IsCancellationRequested)
         {
-            await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
-            if (_queue.TryDequeue(out var msg))
+            await Task.Delay(TimeSpan.FromSeconds(CreatePagesDelaySecond), stoppingToken);
+            
+            List<MessageData> data = new();
+
+            for (int i = 0; i < MaxPagesCreate; i++)
             {
-                await CreateMessagePage(msg, stoppingToken);
+                if (!_queue.TryDequeue(out var msg)) break;
+                data.Add(msg);
             }
+
+            if (data.Count > 0)
+            {
+                var notionGroupIdList = data.Aggregate("", (current, messageData) => current + $"{messageData.NotionDatabaseIdList} ");
+
+                _logger.LogInformation($"Notion Page Creator: Creating {data.Count} message pages in databases: {notionGroupIdList}");
+            }
+            else
+            {
+                _logger.LogInformation("Notion Page Creator: There is no messages to create");
+            }
+
+            foreach (var msg in data)
+            {
+                foreach (var groupId in msg.NotionDatabaseIdList)
+                {
+                    await CreateMessagePage(msg, stoppingToken, groupId);
+                }
+            }
+            
+            _logger.LogInformation($"Notion Page Creator: Created {data.Count} info pages.");
         }
     }
 
-    private async Task CreateMessagePage(MessageData data, CancellationToken stoppingToken)
+    private async Task CreateMessagePage(MessageData data, CancellationToken stoppingToken, string databaseId)
     {
-
         var databaseParentInput = new DatabaseParentInput
         {
-            DatabaseId = _configuration["DatabaseId"]
+            DatabaseId = databaseId
         };
         var builder = PagesCreateParametersBuilder.Create(databaseParentInput);
         builder.AddPageContent(GetPageContent(data.Content));
@@ -66,8 +91,7 @@ public class NotionPageCreator : BackgroundService
         }
         catch (Exception e)
         {
-            Console.WriteLine(e); 
-            throw;
+            Console.WriteLine(e);
         }
     }
 

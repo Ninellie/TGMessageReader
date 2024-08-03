@@ -14,13 +14,15 @@ public class MessageData
     public string ChatTitle { get; }
     public Message Message { get; }
     public double Price { get; }
+    public List<string> NotionDatabaseIdList { get; }
 
-    public MessageData(Message message, string chatTitle, string postAuthor, bool writeLogs = false)
+    public MessageData(Message message, string chatTitle, string postAuthor, List<string> notionDatabaseIdList, bool writeLogs = false)
     {
         Message = message;
         ChatTitle = chatTitle;
         PostAuthor = postAuthor;
         Price = ExtractPrice(Content);
+        NotionDatabaseIdList = notionDatabaseIdList;
         if (writeLogs)
         {
             HandleCreatedMessageLogs();
@@ -37,7 +39,7 @@ public class MessageData
         Console.WriteLine($"Content: {Content}");
     }
 
-    public double ExtractPrice(string text)
+    public static double ExtractPrice(string text)
     {
         double price = 0;
         var results = NumberWithUnitRecognizer.RecognizeCurrency(text, Culture.English);

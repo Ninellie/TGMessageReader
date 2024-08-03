@@ -24,10 +24,10 @@ public class ScanTimerService : BackgroundService
         _logger.LogInformation("Scan Timer Service start");
         while (!stoppingToken.IsCancellationRequested)
         {
-            foreach (var group in _groups.AsEnumerable())
+            foreach (var (key, value) in _groups.AsEnumerable())
             {
-                if (group.Value == null) continue;
-                var tasks = ScanTask.GetScanTasks(group.Value, ScanIntervalInDays * 24, DateTime.Today);
+                if (value == null) continue;
+                var tasks = ScanTask.GetScanTasks(value, ScanIntervalInDays * 24, DateTime.Today);
                 foreach (var task in tasks)
                 {
                     _scanTaskQueue.Enqueue(task);
