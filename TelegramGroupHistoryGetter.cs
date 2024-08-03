@@ -87,6 +87,7 @@ public class TelegramGroupHistoryGetter
 
                 await Task.Delay(TimeSpan.FromSeconds(UserGetterDelay));
                 var userName = await GetUser(validMessage, inputPeer);
+                //var userName = 
                 messageDataList.Add(new MessageData(validMessage, groupMainUsername, userName));
                 oldestId = validMessage.ID;
             }
@@ -129,7 +130,20 @@ public class TelegramGroupHistoryGetter
             peer = chatId,
             user_id = message.from_id.ID
         };
-        var userInfo = await _client.Users_GetFullUser(inputUserFromMessage);
-        return userInfo.users.FirstOrDefault().Value.MainUsername;
+        try
+        { 
+            var userInfo = await _client.Users_GetFullUser(inputUserFromMessage); 
+            return userInfo.users.FirstOrDefault().Value.MainUsername;
+        }
+        catch (Exception exception)
+        {
+            if (exception == null)
+            {
+                _logger.LogError(exception.Message); 
+                Console.WriteLine(exception);
+            }
+        }
+
+        return "";
     }
 }
