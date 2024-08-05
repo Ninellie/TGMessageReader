@@ -17,6 +17,7 @@ public class Program
 
         var bot = CreateBot(builder.Configuration);
         var client = await CreateClient(builder.Configuration);
+
         builder.Services.AddSingleton(bot);
         builder.Services.AddSingleton(client);
         builder.Services.AddSingleton<ScanTaskQueue>();
@@ -36,6 +37,7 @@ public class Program
     private static async Task<Client> CreateClient(IConfiguration configuration)
     {
         var telegramConfig = configuration.GetRequiredSection("TelegramConfig");
+
         var client = new Client(what =>
         {
             if (what != "verification_code") return telegramConfig[what];
@@ -46,6 +48,7 @@ public class Program
         Console.WriteLine($"Logged-in as {myself} (id {myself.id})");
         return client;
     }
+
     private static Bot CreateBot(IConfiguration configuration)
     {
         var connectionString = configuration.GetConnectionString("Database");
@@ -54,6 +57,7 @@ public class Program
         var botToken = telegramConfig["bot_token"]!;
         var apiId = int.Parse(telegramConfig["api_id"]!);
         var apiHash = telegramConfig["api_hash"]!;
+
         return new Bot(botToken, apiId, apiHash, connection);
     }
 }

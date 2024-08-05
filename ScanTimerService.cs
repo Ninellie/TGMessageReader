@@ -36,5 +36,21 @@ public class ScanTimerService : BackgroundService
             await Task.Delay(TimeSpan.FromDays(ScanIntervalInDays), stoppingToken);
         }
     }
+}
+
+public class ScanTaskProvider
+{
+    public List<ScanTask> GetYesterdayTasks(string group)
+    {
+        var tasks = ScanTask.GetScanTasks(group, 24, DateTime.Today);
+        return tasks;
+    }
+
+    public List<ScanTask> GetHourTasksFromNowDayAgo(string group)
+    {
+        var tasks = ScanTask.GetScanTasks(group, 24, DateTime.Today);
+        return tasks;
+    }
+
 
 }
