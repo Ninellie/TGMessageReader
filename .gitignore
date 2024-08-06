@@ -365,3 +365,4 @@ FodyWeavers.xsd
 # Rider
 .idea/
 /appsettings.json
+/Properties/launchSettings.json
