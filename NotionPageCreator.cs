@@ -10,8 +10,8 @@ public class NotionPageCreator : BackgroundService
     private readonly NotionPageCreateTaskQueue _queue;
     private readonly ILogger<NotionPageCreator> _logger;
     private readonly NotionClient _client;
-    private const int MaxPagesCreate = 10;
-    private const int CreatePagesDelaySecond = 10;
+    private const int MaxPagesCreate = 60;
+    private const int CreatePagesDelaySecond = 120;
 
     public NotionPageCreator(IConfiguration config, NotionPageCreateTaskQueue queue, ILogger<NotionPageCreator> logger)
     {
