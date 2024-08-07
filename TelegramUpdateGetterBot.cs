@@ -88,7 +88,7 @@ public class TelegramUpdateGetterBot : BackgroundService
                     if (update.Message is { Text: { Length: > 0 } text } message)
                     {
                         var username = message.From?.Username;
-                        if (username != null && _whiteList.ContainsKey(username))
+                        if (username != null && _whiteList.ContainsValue(username))
                         {
                             if (text == "/hello")
                             {
