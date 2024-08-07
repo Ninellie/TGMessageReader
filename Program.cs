@@ -1,8 +1,4 @@
-﻿using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using WTelegram;
+﻿using WTelegram;
 
 namespace MessageReader;
 
@@ -16,13 +12,15 @@ public class Program
         builder.Logging.AddProvider(fileLoggerProvider);
 
         var bot = CreateBot(builder.Configuration);
-        var client = await CreateClient(builder.Configuration);
+        var telegramClientFactory = new TGClientFactory(builder.Configuration);
+        var client = telegramClientFactory.Create();
 
+        builder.Services.AddSingleton(telegramClientFactory);
         builder.Services.AddSingleton(bot);
         builder.Services.AddSingleton(client);
         builder.Services.AddSingleton<ScanTaskQueue>();
         builder.Services.AddSingleton<NotionPageCreateTaskQueue>();
-        builder.Services.AddSingleton<TelegramGroupHistoryGetter>();
+        builder.Services.AddSingleton<TelegramGroupHistoryService>();
 
         builder.Services.AddHostedService<NotionPageCreator>();
         builder.Services.AddHostedService<TelegramUpdateGetterBot>();
@@ -32,21 +30,6 @@ public class Program
 
         var app = builder.Build();
         await app.RunAsync();
-    }
-
-    private static async Task<Client> CreateClient(IConfiguration configuration)
-    {
-        var telegramConfig = configuration.GetRequiredSection("TelegramConfig");
-
-        var client = new Client(what =>
-        {
-            if (what != "verification_code") return telegramConfig[what];
-            Console.Write("Code: ");
-            return Console.ReadLine();
-        });
-        var myself = await client.LoginUserIfNeeded();
-        Console.WriteLine($"Logged-in as {myself} (id {myself.id})");
-        return client;
     }
 
     private static Bot CreateBot(IConfiguration configuration)

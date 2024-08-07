@@ -1,31 +1,36 @@
-﻿using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using WTelegram;
+﻿using WTelegram;
 
 namespace MessageReader;
 
 public class TelegramScanTaskHandlerService : BackgroundService
 {
     private readonly Bot _bot;
-    private readonly TelegramGroupHistoryGetter _client;
+    private readonly TelegramGroupHistoryService _client;
     private readonly ScanTaskQueue _scanQueue;
     private readonly NotionPageCreateTaskQueue _notionQueue;
     private readonly ILogger<TelegramScanTaskHandlerService> _logger;
+    private readonly TGClientFactory _clientFactory;
 
-    public TelegramScanTaskHandlerService(Bot bot, TelegramGroupHistoryGetter client, ScanTaskQueue scanQueue,
-        NotionPageCreateTaskQueue notionQueue, ILogger<TelegramScanTaskHandlerService> logger)
+    public TelegramScanTaskHandlerService(Bot bot, TelegramGroupHistoryService client, ScanTaskQueue scanQueue,
+        NotionPageCreateTaskQueue notionQueue, ILogger<TelegramScanTaskHandlerService> logger, TGClientFactory clientFactory)
     {
         _bot = bot;
         _client = client;
         _scanQueue = scanQueue;
         _notionQueue = notionQueue;
         _logger = logger;
+        _clientFactory = clientFactory;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("___________________________________________________\n");
-        _logger.LogInformation("Scan Task Handler Service just start");
+        _logger.LogInformation("Scan Task Handler Service: Just started");
+
+        _logger.LogInformation("Scan Task Handler Service: Waiting for client logged in");
+        await _clientFactory.WaitAsync();
+        _logger.LogInformation("Scan Task Handler Service: Fully started and ready to handle scan tasks");
+
 
         while (!stoppingToken.IsCancellationRequested)
         {
@@ -50,7 +55,7 @@ public class TelegramScanTaskHandlerService : BackgroundService
         {
             return;
         }
-
+        
         var messagesFromGroup = await _client.GetMessagesInDateRange(groupName, task.OlderThan, task.NewerThan);
 
         if (!messagesFromGroup.Any())

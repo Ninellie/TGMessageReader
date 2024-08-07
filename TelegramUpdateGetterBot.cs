@@ -1,7 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-using Telegram.Bot.Types.Enums;
+﻿using Telegram.Bot.Types.Enums;
 using WTelegram;
 using Chat = Telegram.Bot.Types.Chat;
 
@@ -57,16 +54,19 @@ public class TelegramUpdateGetterBot : BackgroundService
     private readonly Bot _bot;
     private readonly ScanTaskQueue _scanQueue;
     private readonly ILogger<TelegramUpdateGetterBot> _logger;
-    private readonly string[]? _whiteList;
+    private readonly Dictionary<string, string?> _whiteList;
+
+    private readonly TGClientFactory _clientFactory;
 
     //private readonly List<BotRequestHandler> _requestHandlers = new();
 
-    public TelegramUpdateGetterBot(Bot bot, IConfiguration config, ScanTaskQueue scanScanQueue, ILogger<TelegramUpdateGetterBot> logger)
+    public TelegramUpdateGetterBot(Bot bot, IConfiguration config, ScanTaskQueue scanScanQueue, ILogger<TelegramUpdateGetterBot> logger, TGClientFactory clientFactory)
     {
         _bot = bot;
-        _whiteList = config.GetRequiredSection("AllowedHosts").Value?.Split(",");
+        _whiteList = config.GetSection("ScanConfig").GetSection("AllowedClients").AsEnumerable().ToDictionary();
         _scanQueue = scanScanQueue;
         _logger = logger;
+        _clientFactory = clientFactory;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -87,7 +87,8 @@ public class TelegramUpdateGetterBot : BackgroundService
                 {
                     if (update.Message is { Text: { Length: > 0 } text } message)
                     {
-                        if (_whiteList != null && _whiteList.Contains(message.From?.Username))
+                        var username = message.From?.Username;
+                        if (username != null && _whiteList.ContainsKey(username))
                         {
                             if (text == "/hello")
                             {
@@ -108,6 +109,11 @@ public class TelegramUpdateGetterBot : BackgroundService
                             {
                                 await _bot.SendTextMessage(message.Chat, $"/help - get list of commands\n" +
                                                                          $"/scan/@groupName/number of hours from now - Send group name to scan for number of hours.\n)");
+                            }
+                            else if (text == "/init")
+                            {
+                                var code = text.Remove(0, 6);
+                                await _clientFactory.SetVerificationCode(code);
                             }
                             else
                             {

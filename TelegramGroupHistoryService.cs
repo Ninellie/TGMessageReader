@@ -1,20 +1,18 @@
 ﻿using System.Globalization;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using TL;
 using WTelegram;
 
 namespace MessageReader;
 
-public class TelegramGroupHistoryGetter
+public class TelegramGroupHistoryService
 {
     private readonly Client _client;
-    private readonly ILogger<TelegramGroupHistoryGetter> _logger;
+    private readonly ILogger<TelegramGroupHistoryService> _logger;
     private const int UserGetterDelay = 2;
     private const int MessageGetterDelay = 5;
     private readonly IConfiguration _configuration;
 
-    public TelegramGroupHistoryGetter(Client client, ILogger<TelegramGroupHistoryGetter> logger, IConfiguration configuration)
+    public TelegramGroupHistoryService(Client client, ILogger<TelegramGroupHistoryService> logger, IConfiguration configuration)
     {
         _client = client;
         _logger = logger;

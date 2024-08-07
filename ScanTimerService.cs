@@ -1,8 +1,4 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
-
-namespace MessageReader;
+﻿namespace MessageReader;
 
 public class ScanTimerService : BackgroundService
 {
@@ -24,16 +20,22 @@ public class ScanTimerService : BackgroundService
         _logger.LogInformation("Scan Timer Service start");
         while (!stoppingToken.IsCancellationRequested)
         {
-            foreach (var (key, value) in _groups.AsEnumerable())
+            EnqueueDailyScanTasks();
+            var timeToWait = DateTime.Today.AddDays(1) - DateTime.Now;
+            await Task.Delay(timeToWait, stoppingToken);
+        }
+    }
+
+    private void EnqueueDailyScanTasks()
+    {
+        foreach (var (key, value) in _groups.AsEnumerable())
+        {
+            if (value == null) continue;
+            var tasks = ScanTask.GetScanTasks(value, ScanIntervalInDays * 24, DateTime.Today);
+            foreach (var task in tasks)
             {
-                if (value == null) continue;
-                var tasks = ScanTask.GetScanTasks(value, ScanIntervalInDays * 24, DateTime.Today);
-                foreach (var task in tasks)
-                {
-                    _scanTaskQueue.Enqueue(task);
-                }
+                _scanTaskQueue.Enqueue(task);
             }
-            await Task.Delay(TimeSpan.FromDays(ScanIntervalInDays), stoppingToken);
         }
     }
 }
