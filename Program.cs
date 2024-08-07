@@ -12,7 +12,7 @@ public class Program
         builder.Logging.AddProvider(fileLoggerProvider);
 
         var bot = CreateBot(builder.Configuration);
-        var telegramClientFactory = new TGClientFactory(builder.Configuration);
+        var telegramClientFactory = new TGClientFactory(builder.Configuration, bot);
         var client = telegramClientFactory.Create();
 
         builder.Services.AddSingleton(telegramClientFactory);

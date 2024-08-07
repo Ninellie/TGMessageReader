@@ -74,6 +74,8 @@ public class TelegramUpdateGetterBot : BackgroundService
         _logger.LogInformation("___________________________________________________\n");
         _logger.LogInformation("Update Getter Bot start receiving bot updates");
 
+        await _clientFactory.WaitAsync();
+
         await _bot.DropPendingUpdates();
         _bot.WantUnknownTLUpdates = true;
         int offset = 0;
@@ -109,11 +111,6 @@ public class TelegramUpdateGetterBot : BackgroundService
                             {
                                 await _bot.SendTextMessage(message.Chat, $"/help - get list of commands\n" +
                                                                          $"/scan/@groupName/number of hours from now - Send group name to scan for number of hours.\n)");
-                            }
-                            else if (text == "/init")
-                            {
-                                var code = text.Remove(0, 6);
-                                await _clientFactory.SetVerificationCode(code);
                             }
                             else
                             {

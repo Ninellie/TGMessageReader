@@ -21,7 +21,7 @@
     },
     "resourceName": {
       "type": "string",
-      "defaultValue": "MessageReader20240807000445",
+      "defaultValue": "MessageReader20240807043326",
       "metadata": {
         "description": "Name of the main resource to be created by this template."
       }
