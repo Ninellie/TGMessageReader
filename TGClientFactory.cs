@@ -7,8 +7,8 @@ public class TGClientFactory
     private readonly SemaphoreSlim _loginEvent = new(0, 2);
 
     private readonly IConfiguration _telegramConfig;
+    private readonly Bot _bot;
     private Client _client;
-    private Bot _bot;
     private bool _isLogging;
     private bool _isLoggedIn;
 

@@ -60,7 +60,8 @@ public class TelegramUpdateGetterBot : BackgroundService
 
     //private readonly List<BotRequestHandler> _requestHandlers = new();
 
-    public TelegramUpdateGetterBot(Bot bot, IConfiguration config, ScanTaskQueue scanScanQueue, ILogger<TelegramUpdateGetterBot> logger, TGClientFactory clientFactory)
+    public TelegramUpdateGetterBot(Bot bot, IConfiguration config, ScanTaskQueue scanScanQueue,
+        ILogger<TelegramUpdateGetterBot> logger, TGClientFactory clientFactory)
     {
         _bot = bot;
         _whiteList = config.GetSection("ScanConfig").GetSection("AllowedClients").AsEnumerable().ToDictionary();
@@ -162,38 +163,21 @@ public class TelegramUpdateGetterBot : BackgroundService
             {
                 _bot.SendTextMessage(chat, "request must be valid");
             }
+
             return false;
         }
 
         var request = requestString.Trim().Split('/');
-        request[1] = request[1].ToLower();
-        if (!request[1].StartsWith("scan"))
-        {
-            if (chat != null)
-            {
-                _bot.SendTextMessage(chat, "request must starts with /scan");
-            }
-            return false;
-        }
+
+        if (!IsValidScanCommand(request[1], chat)) return false;
+        
+        var groupName = ParseGroupName(request[2]);
+
+        if (!IsValidGroupName(groupName, chat)) return false;
+
+        //todo добавить туть проверку на существование группы... Но как?
 
         var scanDepth = -1;
-
-        var groupName = request[2];
-        if (groupName.StartsWith("@"))
-        {
-            groupName = groupName.Remove(0, 1);
-        }
-
-        if (!IsValidString(groupName))
-        {
-            if (chat != null)
-            {
-                _bot.SendTextMessage(chat, $"Group name is empty");
-            }
-            return false;
-        }
-
-        //todo добавить туть проверку на существование группы
 
         if (request.Length >= 3)
         {
@@ -209,13 +193,42 @@ public class TelegramUpdateGetterBot : BackgroundService
                 {
                     _bot.SendTextMessage(chat, $"Scanning depth can not be 0. No messages will be scanned");
                 }
+
                 return false;
             }
         }
 
         scanTasks = ScanTask.GetScanTasks(groupName, scanDepth, DateTime.Now, chat: chat);
         return true;
-        
+    }
 
+
+    private bool IsValidScanCommand(string requestString, Chat? chat)
+    {
+        requestString.ToLower();
+        if (requestString.StartsWith("scan")) return true;
+        if (chat != null)
+        {
+            _logger.LogWarning("Scan request must starts with /scan");
+        }
+
+        return false;
+    }
+
+    private bool IsValidGroupName(string groupName, Chat? chat)
+    {
+        if (IsValidString(groupName)) return true;
+
+        if (chat != null)
+        {
+            _bot.SendTextMessage(chat, $"Group name is empty");
+        }
+
+        return false;
+    }
+
+    private string ParseGroupName(string groupName)
+    {
+        return groupName.StartsWith("@") ? groupName.Remove(0, 1) : groupName;
     }
 }
