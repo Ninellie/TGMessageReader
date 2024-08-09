@@ -13,12 +13,14 @@ public class ScanTimerService : BackgroundService
     private readonly List<string> _groups = new();
     private readonly ScanMode _mode;
     private readonly ScanTaskProvider _scanTaskProvider = new();
-
+    private readonly bool _scanAtLaunch;
     public ScanTimerService(IConfiguration config, ScanTaskQueue scanTaskQueue, ILogger<ScanTimerService> logger)
     {
         _scanTaskQueue = scanTaskQueue;
         _logger = logger;
+
         var section = config.GetSection("ScanConfig");
+
         foreach (var group in section.GetSection("Groups").AsEnumerable())
         {
             if (group.Value != null) _groups.Add(group.Value);
@@ -34,17 +36,25 @@ public class ScanTimerService : BackgroundService
         {
             _mode = ScanMode.EachHour;
         }
+
+        _scanAtLaunch = section.GetValue<bool>("ScanAtLaunch");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("___________________________________________________\n");
         _logger.LogInformation("Scan Timer Service start");
-        while (!stoppingToken.IsCancellationRequested)
+
+        if (_scanAtLaunch)
         {
             EnqueueScanTasks();
+        }
+
+        while (!stoppingToken.IsCancellationRequested)
+        {
             var timeToWait = GetDelayTime();
             await Task.Delay(timeToWait, stoppingToken);
+            EnqueueScanTasks();
         }
     }
 
@@ -56,7 +66,6 @@ public class ScanTimerService : BackgroundService
             if (_mode == ScanMode.EachDay)
             {
                 tasks = _scanTaskProvider.GetYesterdayTasks(groupName);
-                
             }
             else
             {
