@@ -52,6 +52,7 @@ public class TGClientFactory
 
         await _client.LoginUserIfNeeded();
         _loginEvent.Release(2);
+        _isLogging = false;
         _isLoggedIn = true;
     }
 
