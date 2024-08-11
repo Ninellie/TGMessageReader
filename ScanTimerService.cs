@@ -81,6 +81,6 @@ public class ScanTimerService : BackgroundService
         {
             return DateTime.Today.AddDays(1) - DateTime.Now;
         }
-        return DateTime.Today.AddHours(1) - DateTime.Now;
+        return DateTime.Today.AddHours(1).AddHours(DateTime.Now.Hour) - DateTime.Now;
     }
 }
