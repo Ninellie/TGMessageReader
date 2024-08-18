@@ -22,6 +22,13 @@ public class Program
         builder.Services.AddSingleton<NotionPageCreateTaskQueue>();
         builder.Services.AddSingleton<TelegramGroupHistoryService>();
 
+        builder.Services.AddSingleton<NotAllowedRequestHandler>();
+        builder.Services.AddSingleton<HelpRequestHandler>();
+        builder.Services.AddSingleton<ScanRequestHandler>();
+        builder.Services.AddSingleton<GroupsRequestHandler>();
+
+        builder.Services.AddSingleton<RequestHandlerProvider>();
+
         builder.Services.AddHostedService<NotionPageCreator>();
         builder.Services.AddHostedService<TelegramBotUpdateHandler>();
         builder.Services.AddHostedService<TelegramScanTaskHandlerService>();
