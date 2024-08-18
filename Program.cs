@@ -23,7 +23,7 @@ public class Program
         builder.Services.AddSingleton<TelegramGroupHistoryService>();
 
         builder.Services.AddHostedService<NotionPageCreator>();
-        builder.Services.AddHostedService<TelegramUpdateGetterBot>();
+        builder.Services.AddHostedService<TelegramBotUpdateHandler>();
         builder.Services.AddHostedService<TelegramScanTaskHandlerService>();
         builder.Services.AddHostedService<ScanTimerService>();
         builder.Services.AddMemoryCache();

@@ -4,64 +4,48 @@ using Chat = Telegram.Bot.Types.Chat;
 
 namespace MessageReader;
 
-public enum RequestState
-{
-    WaitingForScan,
-    WaitingForScanRequest,
-}
-
 public abstract class BotRequestHandler
 {
-    protected string CurrentResponseMessage { get; set; }
-    protected string LastReceivedMessage { get; set; }
+    protected string RequestString { get; set; }
 
     protected readonly Bot bot;
     protected readonly Chat chat;
-    protected RequestState state;
 
-    protected BotRequestHandler(Bot bot, Chat chat, RequestState state, string lastReceivedMessage)
+    protected BotRequestHandler(Bot bot, Chat chat, string requestString)
     {
         this.bot = bot;
         this.chat = chat;
-        this.state = state;
-        LastReceivedMessage = lastReceivedMessage;
-        CurrentResponseMessage = "";
+        RequestString = requestString;
     }
 
-    public abstract Task Start();
-    public abstract Task End();
+    public abstract Task Handle(CancellationToken stoppingToken);
 }
 
-class ScanHandler : BotRequestHandler
+public class ScanHandler : BotRequestHandler
 {
-    public ScanHandler(Bot bot, Chat chat, RequestState state, string lastReceivedMessage) : base(bot, chat, state, lastReceivedMessage)
+    public ScanHandler(Bot bot, Chat chat, string requestString) : base(bot, chat, requestString)
     {
     }
 
-    public override Task Start()
-    {
-        throw new NotImplementedException();
-    }
-
-    public override Task End()
+    public override Task Handle(CancellationToken stoppingToken)
     {
         throw new NotImplementedException();
     }
 }
 
-public class TelegramUpdateGetterBot : BackgroundService
+public class TelegramBotUpdateHandler : BackgroundService
 {
     private readonly Bot _bot;
     private readonly ScanTaskQueue _scanQueue;
-    private readonly ILogger<TelegramUpdateGetterBot> _logger;
+    private readonly ILogger<TelegramBotUpdateHandler> _logger;
     private readonly Dictionary<string, string?> _whiteList;
 
     private readonly TGClientFactory _clientFactory;
 
     //private readonly List<BotRequestHandler> _requestHandlers = new();
 
-    public TelegramUpdateGetterBot(Bot bot, IConfiguration config, ScanTaskQueue scanScanQueue,
-        ILogger<TelegramUpdateGetterBot> logger, TGClientFactory clientFactory)
+    public TelegramBotUpdateHandler(Bot bot, IConfiguration config, ScanTaskQueue scanScanQueue,
+        ILogger<TelegramBotUpdateHandler> logger, TGClientFactory clientFactory)
     {
         _bot = bot;
         _whiteList = config.GetSection("ScanConfig").GetSection("AllowedClients").AsEnumerable().ToDictionary();
@@ -79,7 +63,7 @@ public class TelegramUpdateGetterBot : BackgroundService
 
         await _bot.DropPendingUpdates();
         _bot.WantUnknownTLUpdates = true;
-        int offset = 0;
+        var offset = 0;
         while (!stoppingToken.IsCancellationRequested)
         {
             await Task.Delay(TimeSpan.FromSeconds(1), stoppingToken);
