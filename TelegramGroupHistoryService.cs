@@ -133,6 +133,9 @@ public class TelegramGroupHistoryService
 
     private async Task<string> GetUser(Message message, InputPeer chatId)
     {
+        if (message == null) return "";
+        if (chatId == null) return "";
+        if (message.from_id == null) return "";
         var inputUserFromMessage = new InputUserFromMessage
         {
             msg_id = message.id,
@@ -146,7 +149,7 @@ public class TelegramGroupHistoryService
         }
         catch (Exception exception)
         {
-            if (exception == null)
+            if (exception != null)
             {
                 _logger.LogError(exception.Message); 
                 Console.WriteLine(exception);
